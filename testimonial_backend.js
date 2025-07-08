@@ -1,54 +1,57 @@
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const fetch = require('node-fetch');
 const cors = require('cors');
+const { Configuration, OpenAIApi } = require('openai');
+
+require('dotenv').config();
 
 const app = express();
+const port = process.env.PORT || 3000;
+
 app.use(cors());
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3000;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
 
 app.post('/generate', async (req, res) => {
-  const { company, benefit1, benefit2, benefit3 } = req.body;
+  const { company, experience, goals, audience, reason, results } = req.body;
 
   const prompt = `
-    Please write a grammatically correct and professionally worded client testimonial based on the following:
-    - Company: ${company}
-    - Positive Results: ${benefit1}
-    - Most Valuable Experience: ${benefit2}
-    - Recommendation Reason: ${benefit3}
+You are a professional copywriter tasked with crafting a polished, well-written testimonial for a satisfied client of The Business Journals.
 
-    The testimonial should flow smoothly, sound authentic, and include all points naturally.
-  `;
+Using the following rough notes and key points, rewrite them into a flowing testimonial that sounds authentic, positive, and professional. Use full sentences, excellent grammar, and a cohesive narrative — not a list of inputs. Avoid simply repeating the phrasing.
+
+Client Input:
+- Company: ${company}
+- Experience: ${experience}
+- Goals: ${goals}
+- Audience: ${audience}
+- Reason for recommending: ${reason}
+- Results: ${results}
+
+Testimonial:
+`;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'text-davinci-003',
-        prompt: prompt,
-        max_tokens: 200,
-        temperature: 0.7
-      })
+    const completion = await openai.createCompletion({
+      model: 'text-davinci-003',
+      prompt,
+      max_tokens: 300,
+      temperature: 0.8,
     });
 
-    const data = await response.json();
-    const text = data.choices?.[0]?.text?.trim() || 'Error: No response from AI';
-
-    res.json({ testimonial: text });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to contact OpenAI' });
+    const testimonial = completion.data.choices[0].text.trim();
+    res.json({ testimonial });
+  } catch (error) {
+    console.error('Error generating testimonial:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to generate testimonial.' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });
